@@ -1,7 +1,5 @@
 import json
-
 from flask import Flask, jsonify, request
-
 from db import (
     get_all_products_from_db,
     get_product_by_id_from_db,
@@ -23,80 +21,56 @@ def health():
 
 @app.get("/products")
 def get_products():
-    """
-    Del 2:
-    Den här endpointen hämtar redan produkter från PostgreSQL.
+    # ✅ TODO Uppgift 12-15 - Check Redis first, fall back to PostgreSQL
+    cached = get_cached_products()
+    if cached is not None:
+        print("CACHE HIT")
+        return app.response_class(response=cached, status=200, mimetype="application/json")
 
-    Del 4:
-    Studenterna ska senare bygga ut endpointen med Redis-cache.
-    """
-    # TODO Del 4 (Uppgift 12-15):
-    # 1. Kontrollera Redis först med get_cached_products()
-    # 2. Om cache finns: skriv ut "CACHE HIT" och returnera cachead JSON
-    # 3. Om cache saknas: skriv ut "CACHE MISS" och läs från PostgreSQL
-    # 4. Spara resultatet i Redis med set_cached_products()
-
+    print("CACHE MISS")
     products = get_all_products_from_db()
+
+    # Convert list to JSON string before saving to Redis
+    json_string = json.dumps(products)
+    set_cached_products(json_string)
+    
     return jsonify(products), 200
 
 
 @app.get("/products/<int:product_id>")
 def get_product(product_id):
-    """
-    Del 2:
-    TODO (Uppgift 5 och 6).
-
-    Förväntat beteende:
-    - Om produkten finns: returnera produkten som JSON med 200 OK
-    - Om produkten inte finns: returnera {"error": "Product not found"} med 404
-    """
+    # ✅ TODO Uppgift 5 & 6 - Return product or 404
     product = get_product_by_id_from_db(product_id)
-
-    # TODO: Implementera 404 Not Found om produkten inte existerar (Uppgift 6).
-    return jsonify({
-        "message": "TODO: Implementera GET /products/{id} (Uppgift 5)",
-        "product_id": product_id,
-        "hint": "Använd get_product_by_id_from_db(product_id) i db.py"
-    }), 501
+    if product is None:
+        return jsonify({"error": "Product not found"}), 404
+    return jsonify(product), 200
 
 
 @app.post("/products")
 def create_product():
-    """
-    Del 3:
-    TODO (Uppgift 7-10).
-
-    Förväntat beteende:
-    - Läs JSON från requesten
-    - Validera name och price
-    - Avvisa saknat name, saknat price eller negativt price med 400 Bad Request
-    - Spara produkten i PostgreSQL
-    - Returnera skapad produkt med 201 Created
-    - Del 5: Töm produktcachen efter lyckad insert (Uppgift 17)
-    """
     data = request.get_json(silent=True)
 
-    # TODO: Validera inkommande data och stoppa ogiltiga requests (Uppgift 10).
-    # Exempel som ska ge 400:
-    # {}
-    # {"price": 999}
-    # {"name": "Webcam"}
-    # {"name": "Webcam", "price": -10}
+    # ✅ TODO Uppgift 10 - Validate input
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+    if "name" not in data or not data["name"]:
+        return jsonify({"error": "Missing required field: name"}), 400
+    if "price" not in data:
+        return jsonify({"error": "Missing required field: price"}), 400
+    if not isinstance(data["price"], (int, float)) or data["price"] < 0:
+        return jsonify({"error": "price must be a non-negative number"}), 400
 
-    # TODO: Spara ny produkt i PostgreSQL med insert_product_into_db(data) (Uppgift 8).
-    # TODO Del 5: Töm produktcachen med clear_products_cache() efter POST (Uppgift 17).
+    # ✅ TODO Uppgift 8 - Insert into PostgreSQL
+    product = insert_product_into_db(data)
 
-    return jsonify({
-        "message": "TODO: Implementera POST /products (Uppgift 7-9)",
-        "received": data
-    }), 501
+    # ✅ TODO Uppgift 17 - Invalidate cache so GET /products reflects the new product
+    clear_products_cache()
+
+    return jsonify(product), 201
 
 
 @app.get("/crash")
 def crash():
-    """
-    Optional endpoint for discussing 500 Internal Server Error.
-    """
     raise Exception("Simulated server error")
 
 

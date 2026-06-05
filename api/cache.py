@@ -1,13 +1,11 @@
 import os
 import redis
 
+CACHE_KEY = "products"
+CACHE_TTL = 60  # seconds
+
 
 def get_redis_client():
-    """
-    Creates a Redis client.
-
-    Redis is used in this lab to cache the product list for GET /products.
-    """
     return redis.Redis(
         host=os.getenv("REDIS_HOST", "localhost"),
         port=int(os.getenv("REDIS_PORT", "6379")),
@@ -15,40 +13,16 @@ def get_redis_client():
     )
 
 
-redis_client = get_redis_client()
-
-
 def get_cached_products():
-    """
-    TODO:
-    Används i Del 4 (Uppgift 12 och 15).
-
-    Den ska:
-    - Försöka läsa nyckeln "products" från Redis
-    - Returnera cachead data om den finns
-    - Returnera None om cachen är tom
-    """
-    # TODO: Implementera läsning från cache.
-    return None
+    # ✅ TODO Uppgift 12 & 15 - Read from Redis, return string or None
+    return get_redis_client().get(CACHE_KEY)
 
 
 def set_cached_products(json_data):
-    """
-    TODO:
-    Används i Del 4 (Uppgift 14).
-
-    Den ska spara JSON-strängen i Redis med nyckeln "products".
-    """
-    # TODO: Implementera skrivning till cache.
-    pass
+    # ✅ TODO Uppgift 14 - Write JSON string to Redis with a TTL
+    get_redis_client().set(CACHE_KEY, json_data, ex=CACHE_TTL)
 
 
 def clear_products_cache():
-    """
-    TODO:
-    Används i Del 5 (Uppgift 17).
-
-    Den ska ta bort nyckeln "products" från Redis efter POST /products.
-    """
-    # TODO: Implementera cache invalidation.
-    pass
+    # ✅ TODO Uppgift 17 - Delete the cache key after POST /products
+    get_redis_client().delete(CACHE_KEY)
